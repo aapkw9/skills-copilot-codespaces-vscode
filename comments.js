@@ -1,22 +1,49 @@
-// Create a web server
-// 1. Start the server and listen on port 3000
-// 2. Create a route for GET /comments
-// 3. Create a route for GET /comments/:id
-// 4. Create a route for POST /comments
-// 5. Create a route for PUT /comments/:id
-// 6. Create a route for DELETE /comments/:id
+// Create web server using node.js
 
-// 1. Start the server and listen on port 3000
-const express = require('express');
-const app = express();
-const port = 3000;
+// Import modules
+var http = require('http');
+var fs = require('fs');
+var url = require('url');
+var qs = require('querystring');
+var template = require('./lib/template.js');
+var path = require('path');
+var sanitizeHtml = require('sanitize-html');
 
-app.listen(port, () => {
-    console.log(`Server started on port ${port}`);
-});
+// Create web server
+var app = http.createServer(function(request,response){
+    var _url = request.url;
+    var queryData = url.parse(_url, true).query; // Get query data
+    var pathname = url.parse(_url, true).pathname; // Get pathname
 
-// 2. Create a route for GET /comments
-// 3. Create a route for GET /comments/:id
-// 4. Create a route for POST /comments
-// 5. Create a route for PUT /comments/:id
-// 6. Create a route for DELETE /comments/:id
+    // If pathname is root
+    if(pathname === '/'){
+        if(queryData.id === undefined){ // If id is undefined
+            fs.readdir('./data', function(error, filelist){ // Read directory
+                var title = 'Welcome';
+                var description = 'Hello, Node.js';
+                var list = template.list(filelist); // Get list of files
+                var html = template.HTML(title, list, `<h2>${title}</h2>${description}`, `<a href="/create">create</a>`); // Create html
+                response.writeHead(200); // Write status code
+                response.end(html); // Send html
+            });
+        } else { // If id is not undefined
+            fs.readdir('./data', function(error, filelist){ // Read directory
+                var filteredId = path.parse(queryData.id).base; // Get filtered id
+                fs.readFile(`data/${filteredId}`, 'utf8', function(err, description){ // Read file
+                    var title = queryData.id;
+                    var sanitizedTitle = sanitizeHtml(title);
+                    var sanitizedDescription = sanitizeHtml(description, {
+                        allowedTags:['h1']
+                    });
+                    var list = template.list(filelist); // Get list of files
+                    var html = template.HTML(sanitizedTitle, list, `<h2>${sanitizedTitle}</h2>${sanitizedDescription}`, `
+                        <a href="/create">create</a>
+                        <a href="/update?id=${sanitizedTitle}">update</a>
+                        <form action="delete_process" method="post">
+                            <input type="hidden" name="id" value="${sanitizedTitle}">
+                            <input type="submit" value="delete">
+                        </form>
+                    `); // Create html
+                    response.writeHead(200); // Write status code
+                    response.end(html); // Send html
+
